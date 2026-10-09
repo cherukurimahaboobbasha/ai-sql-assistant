@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI SQL Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; padding-top: 40px; }
+        .card { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        pre { background: #272822; color: #f8f8f2; padding: 15px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width: 900px;">
+        <h2 class="mb-4 text-center">🤖 AI-Powered Text-to-SQL Assistant</h2>
+        
+        <div class="card p-4 mb-4">
+            <div class="mb-3">
+                <label for="promptInput" class="form-label font-weight-bold">Ask a question in plain English:</label>
+                <input type="text" id="promptInput" class="form-control form-control-lg" placeholder="e.g., Show me all users who bought items worth more than $50">
+            </div>
+            <button onclick="runQuery()" class="btn btn-primary btn-lg w-100" id="btnSubmit">Generate & Execute SQL</button>
+        </div>
+
+        <div id="outputArea" style="display:none;">
+            <div class="card p-4 mb-4">
+                <h5>Generated SQL Query:</h5>
+                <pre><code id="sqlDisplay"></code></pre>
+            </div>
+
+            <div class="card p-4">
+                <h5>Query Execution Results:</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mt-3" id="resultsTable">
+                        <thead class="table-dark" id="tableHead"></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function runQuery() {
+            const prompt = document.getElementById('promptInput').value;
+            if(!prompt) return alert("Please enter a question!");
+
+            const btn = document.getElementById('btnSubmit');
+            btn.innerText = "Processing...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/generate-and-execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                const data = await response.json();
+
+                if(!response.ok) {
+                    alert("Error: " + (data.detail || "Failed to process request"));
+                    return;
+                }
+
+                // Show SQL
+                document.getElementById('sqlDisplay').innerText = data.generated_sql;
+
+                // Render Table
+                const head = document.getElementById('tableHead');
+                const body = document.getElementById('tableBody');
+                head.innerHTML = '';
+                body.innerHTML = '';
+
+                if (data.execution && data.execution.columns && data.execution.columns.length > 0) {
+                    let headRow = '<tr>';
+                    data.execution.columns.forEach(col => headRow += `<th>${col}</th>`);
+                    headRow += '</tr>';
+                    head.innerHTML = headRow;
+
+                    data.execution.data.forEach(row => {
+                        let bodyRow = '<tr>';
+                        row.forEach(val => bodyRow += `<td>${val}</td>`);
+                        bodyRow += '</tr>';
+                        body.innerHTML += bodyRow;
+                    });
+                } else {
+                    body.innerHTML = '<tr><td colspan="100%" class="text-center">No records found.</td></tr>';
+                }
+
+                document.getElementById('outputArea').style.display = 'block';
+
+            } catch (err) {
+                alert("Could not connect to backend server. Make sure Uvicorn is running.");
+            } finally {
+                btn.innerText = "Generate & Execute SQL";
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
